@@ -1,50 +1,94 @@
-name: Build recovery(twrp,shrp,pbrp)
+name: Build Recovery (TWRP, SHRP, PBRP)
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-25.10
 
     steps:
-       - name: Init the System
-         uses: actions/checkout@master
+      - name: Checkout sources
+        uses: actions/checkout@v4
 
-       - name: remove pkg and setting repo
-         run: |
-            sudo apt update && sudo apt install wget zip
-            wget -qO - https://github.com/SA-17/Recovery_builder/raw/main/scripts/cleanup.sh  | bash
-            sudo -E apt-get -qq update
-            sudo -E apt-get -qq install bc build-essential tar zip curl libstdc++6 git wget python3 gcc clang libssl-dev repo rsync flex curl  bison aria2
-            sudo curl --create-dirs -L -o /usr/local/bin/repo -O -L https://storage.googleapis.com/git-repo-downloads/repo
-            sudo chmod a+rx /usr/local/bin/repo
+      - name: Free up storage space
+        run: |
+          echo "🧹 Cleaning up default runner packages to free space..."
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache
+          sudo apt clean
+          docker image prune -a -f || true
+          df -h
 
-       - name: Adding and Sync source
-         run: |
-             source config.sh
-             mkdir work
-             cd work
-             repo init -u $MANIFEST -b $BRANCH --depth=1
-             repo sync -c -j`nproc` --force-sync --no-clone-bundle --no-tags
-             git clone $DT_LINK -b $DT_BRANCH device/$VENDOR/$DEVICE
+      - name: Install required packages and repo tool
+        run: |
+          echo "📦 Installing build dependencies..."
+          sudo apt update
+          sudo apt -y install wget zip curl git
+          wget -qO - https://github.com/SA-17/Recovery_builder/raw/main/scripts/cleanup.sh | bash
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install \
+            bc bison build-essential ccache clang cmake curl flex g++-multilib gcc-multilib \
+            git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev \
+            liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils \
+            lzop pngcrush rsync schedtool squashfs-tools tar zip zlib1g-dev aria2 \
+            python3 python3-pip libtinfo5
+          sudo ln -sf /usr/bin/python3 /usr/bin/python || true
+          sudo curl --create-dirs -L -o /usr/local/bin/repo -O -L https://storage.googleapis.com/git-repo-downloads/repo
+          sudo chmod a+rx /usr/local/bin/repo
+          df -h
 
-       - name: Build recovery
-         run: |
-              source config.sh
-              cd work
-              . build/envsetup.sh && lunch $TYPE$SYM$DEVICE-eng && export ALLOW_MISSING_DEPENDENCIES=true && mka $TARGET -j`nproc`
+      - name: Initialize and sync source
+        run: |
+          source config.sh
+          mkdir work && cd work
+          echo "📡 Initializing repo..."
+          repo init -u $MANIFEST -b $BRANCH --depth=1
+          echo "🔁 Syncing source..."
+          repo sync -c -j$(nproc) --force-sync --no-clone-bundle --no-tags --prune
+          git clone $DT_LINK -b $DT_BRANCH device/$VENDOR/$DEVICE
+          echo "🧹 Removing .repo to save space..."
+          sudo rm -rf .repo
+          df -h
 
-       - name: Making file
-         run: |
-              source config.sh
-              cd work
-              wget -qO - https://github.com/SA-17/Recovery_builder/raw/main/scripts/bake.sh  | bash
+      - name: Setup build environment
+        run: |
+          source config.sh
+          cd work
+          export USE_CCACHE=1
+          export CCACHE_DIR=/tmp/ccache
+          ccache -M 5G
+          . build/envsetup.sh
+          lunch $TYPE$SYM$DEVICE-eng
+          export ALLOW_MISSING_DEPENDENCIES=true
+          df -h
 
-       - name: Release recovery
-         uses: softprops/action-gh-release@v1
-         env:
+      - name: Build recovery image
+        run: |
+          source config.sh
+          cd work
+          echo "⚙️ Building recovery..."
+          mka $TARGET -j$(nproc)
+          df -h
+
+      - name: Make flashable ZIP
+        run: |
+          source config.sh
+          cd work
+          echo "📦 Creating flashable ZIP..."
+          wget -qO - https://github.com/SA-17/Recovery_builder/raw/main/scripts/bake.sh | bash
+          df -h
+
+      - name: Clean build intermediates
+        run: |
+          cd work
+          echo "🧽 Cleaning intermediates to save storage..."
+          sudo rm -rf out/target out/soong .repo
+          df -h
+
+      - name: Upload recovery release
+        uses: softprops/action-gh-release@v1
+        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-         with:
+        with:
           tag_name: ${{ github.run_id }}
-          name: recovery image
+          name: "Recovery Image"
           files: work/recovery.zip
