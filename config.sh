@@ -2,16 +2,16 @@
 
 # about the custom recovery
 export NAME="shrp" # supported: pbrp, shrp, twrp
-export MANIFEST="https://github.com/SHRP-Reborn/manifest.git" # the link of manifest
-export BRANCH="shrp-12.1" # the branch of manifest
+export MANIFEST="https://github.com/SHRP-Reborn/manifest.git"
+export BRANCH="shrp-12.1"
 
 # about your device
-export DEVICE="sunstone" # codename used in device tree
-export DT_LINK="https://github.com/hpsstuff/android_device_xiaomi_sunstone.git" # device tree link
-export DT_BRANCH="twrp" # device tree branch
-export VENDOR="xiaomi" # device manufacturer or vendor
-export TARGET="bootimage" # build method: recoveryimage, bootimage, vendorboot
-export TYPE="omni" # recovery type: omni, twrp, something else
+export DEVICE="sunstone"
+export DT_LINK="https://github.com/hpsstuff/android_device_xiaomi_sunstone.git"
+export DT_BRANCH="sunstone-user-11-UKQ1.240624.001-OS2.0.6.0.UMQCNXM-release-keys"  # ✅ correct branch name
+export VENDOR="xiaomi"
+export TARGET="bootimage"
+export TYPE="omni"
 
 # you dont need to edit these
 export SYM="_"
