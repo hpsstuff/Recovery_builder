@@ -36,6 +36,14 @@ jobs:
           sudo chmod a+rx /usr/local/bin/repo
           df -h
 
+      - name: Install Python 2 for legacy build scripts
+        run: |
+          echo "🐍 Installing Python 2 for legacy AOSP scripts..."
+          sudo apt update
+          sudo apt install -y python2
+          sudo ln -sf /usr/bin/python2 /usr/bin/python
+          python --version || true
+
       - name: Initialize and sync source
         run: |
           source config.sh
